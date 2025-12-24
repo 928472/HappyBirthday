@@ -1,236 +1,177 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>小诞 - 生日快乐</title>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>生日贺卡 - 生日快乐</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Noto+Serif+SC:wght@500;700&display=swap" rel="stylesheet">
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&display=swap" rel="stylesheet">
     <style>
-        :root { --pink-glow: #ff69b4; }
-
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: #000;
-            font-family: 'Noto Serif SC', serif;
-            color: #fff;
-        }
-
-        #canvas-container {
-            position: fixed;
-            inset: 0;
-            z-index: 1;
-        }
-
-        .glass-panel {
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 2rem;
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
-        }
-
-        .neon-text {
-            text-shadow: 0 0 20px var(--pink-glow), 0 0 40px rgba(255, 105, 180, 0.3);
-        }
-
-        .font-handwriting {
-            font-family: 'Dancing Script', cursive;
-        }
-
-        #start-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
-            transition: opacity 1s ease;
-        }
-
-        #main-ui {
-            position: fixed;
-            inset: 0;
-            z-index: 10;
-            pointer-events: none;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .typewriter-cursor::after {
-            content: '|';
-            animation: blink 1s infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-        }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Noto Serif SC', serif; color: white; touch-action: none; }
+        #canvas-container { position: absolute; inset: 0; z-index: 1; }
+        .glass-panel { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 2rem; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
+        .neon-text { text-shadow: 0 0 20px #ff69b4, 0 0 40px rgba(255,105,180,0.3); }
+        #start-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; justify-content: center; align-items: center; background: #000; transition: opacity 1s; }
+        .hidden { display: none !important; }
+        .cake-emoji { font-size: 8rem; filter: drop-shadow(0 0 20px gold); transition: transform 0.3s; }
+        .extinguished { filter: grayscale(1) brightness(0.4) !important; transform: scale(0.9); }
     </style>
 </head>
-
 <body>
-<audio id="bgm" loop>
-    <source src="./src/happy-birthday-155461.mp3" type="audio/mpeg" />
-</audio>
+    <audio id="bgm" loop preload="auto"><source src="./src/happy-birthday-155461.mp3" type="audio/mpeg"></audio>
+    <div id="canvas-container"></div>
 
-<div id="canvas-container"></div>
-
-<div id="start-overlay">
-    <div class="glass-panel p-12 text-center mx-4 border-pink-500/20">
-        <h1 class="text-4xl mb-2 font-handwriting text-pink-400">Special Moment</h1>
-        <h2 class="text-7xl mb-12 font-bold tracking-tighter neon-text">小诞</h2>
-        <button
-            id="start-btn"
-            class="px-16 py-4 bg-white text-black rounded-full font-bold text-xl hover:bg-pink-400 hover:text-white transition-all duration-500 shadow-2xl"
-            style="pointer-events:auto"
-        >
-            开启✨
-        </button>
-    </div>
-</div>
-
-<div id="main-ui" class="flex items-center justify-center opacity-0 transition-opacity duration-1000 px-8">
-    <div class="glass-panel p-10 max-w-lg w-full text-center border-white/5">
-        <div class="text-5xl mb-8">🎂</div>
-        <p
-            id="blessing"
-            class="text-2xl leading-relaxed text-gray-100 font-light tracking-wide min-h-[150px] typewriter-cursor"
-        ></p>
-        <div class="mt-10 pt-6 border-t border-white/10 text-xl font-handwriting text-pink-300 opacity-80">
-            Happy Birthday, Xiaodan.
+    <div id="start-overlay">
+        <div class="text-center p-12 glass-panel border-pink-500/20">
+            <h2 class="text-7xl mb-12 font-bold text-white neon-text">生日贺卡</h2>
+            <button id="start-btn" class="px-16 py-4 bg-white text-black rounded-full font-bold text-xl active:scale-95 transition-all">开启惊喜 ✨</button>
         </div>
     </div>
-</div>
 
-<script>
-/* =======================
-   常量与 DOM 引用
-======================= */
-const TEXT =
-    "岁序更替，华章日新。愿你有直面清晨日光的热忱，亦有漫步黄昏余晖的从容。所有的美好都“诞”生于此，祝你生日快乐。✨";
+    <div id="main-ui" class="fixed inset-0 flex flex-col justify-center items-center opacity-0 transition-opacity duration-1000 z-10 px-8 pointer-events-none">
+        <div id="text-box" class="glass-panel p-8 max-w-lg w-full text-center mb-6 pointer-events-auto">
+            <p id="blessing" class="text-xl leading-relaxed min-h-[140px] text-pink-50 font-medium"></p>
+            <button id="wish-btn" class="hidden mt-6 px-10 py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white font-bold animate-pulse shadow-lg">点击许愿 🎂</button>
+        </div>
 
-const dom = {
-    startBtn: document.getElementById('start-btn'),
-    startOverlay: document.getElementById('start-overlay'),
-    mainUI: document.getElementById('main-ui'),
-    blessing: document.getElementById('blessing'),
-    bgm: document.getElementById('bgm'),
-    canvasContainer: document.getElementById('canvas-container')
-};
+        <div id="cake-area" class="hidden text-center pointer-events-auto">
+            <div id="cake-icon" class="cake-emoji">🎂</div>
+            <p id="mic-tip" class="mt-4 text-pink-400 font-bold animate-bounce text-lg">对着麦克风吹气！💨</p>
+        </div>
+    </div>
 
-/* =======================
-   Three.js 背景
-======================= */
-let scene, camera, renderer, points;
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const wishBtn = document.getElementById('wish-btn');
+        const blessingEl = document.getElementById('blessing');
+        const bgm = document.getElementById('bgm');
+        const text = "岁序更替，华章日新。愿你有直面清晨日光的热忱，亦有漫步黄昏余晖的从容。所有的美好都“诞”生于此，祝你生日快乐。✨";
 
-function initThree() {
-    scene = new THREE.Scene();
+        // --- 粒子引擎保持不变 ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 1, 3000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-    camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        2000
-    );
-    camera.position.z = 1000;
-
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    dom.canvasContainer.appendChild(renderer.domElement);
-
-    const geometry = new THREE.BufferGeometry();
-    const vertices = [];
-
-    for (let i = 0; i < 8000; i++) {
-        vertices.push(
-            THREE.MathUtils.randFloatSpread(2000),
-            THREE.MathUtils.randFloatSpread(2000),
-            THREE.MathUtils.randFloatSpread(2000)
-        );
-    }
-
-    geometry.setAttribute(
-        'position',
-        new THREE.Float32BufferAttribute(vertices, 3)
-    );
-
-    const material = new THREE.PointsMaterial({
-        color: 0xff69b4,
-        size: 2,
-        transparent: true,
-        opacity: 0.6
-    });
-
-    points = new THREE.Points(geometry, material);
-    scene.add(points);
-
-    animate();
-}
-
-function animate() {
-    requestAnimationFrame(animate);
-    points.rotation.y += 0.001;
-    points.rotation.x += 0.0005;
-    renderer.render(scene, camera);
-}
-
-function onResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-/* =======================
-   打字机效果
-======================= */
-function typeWriter(text, el, speed = 60) {
-    let index = 0;
-    el.innerHTML = '';
-
-    function tick() {
-        if (index < text.length) {
-            el.innerHTML += text.charAt(index++);
-            setTimeout(tick, speed);
+        const particlesCount = 8000;
+        const posArray = new Float32Array(particlesCount * 3);
+        const velocity = new Float32Array(particlesCount * 3);
+        for(let i=0; i<particlesCount*3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 2000;
+            velocity[i] = (Math.random() - 0.5) * 2;
         }
-    }
 
-    tick();
-}
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const material = new THREE.PointsMaterial({ color: 0xff69b4, size: 2.5, transparent: true, opacity: 0.8 });
+        const particleMesh = new THREE.Points(geometry, material);
+        scene.add(particleMesh);
+        camera.position.z = 1000;
 
-/* =======================
-   UI 交互
-======================= */
-let started = false;
+        let mouse = new THREE.Vector3(0, 0, -1000);
+        let isMouseDown = false;
 
-dom.startBtn.addEventListener('click', () => {
-    if (started) return;
-    started = true;
+        const onPointerMove = (e) => {
+            const x = (e.clientX || e.touches[0].clientX) / window.innerWidth * 2 - 1;
+            const y = -((e.clientY || e.touches[0].clientY) / window.innerHeight * 2 - 1);
+            mouse.set(x * 1000, y * 1000, 0);
+        };
+        window.addEventListener('mousedown', () => isMouseDown = true);
+        window.addEventListener('mouseup', () => isMouseDown = false);
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('touchstart', () => isMouseDown = true);
+        window.addEventListener('touchend', () => isMouseDown = false);
+        window.addEventListener('touchmove', onPointerMove);
 
-    dom.bgm.play().catch(() => {});
-    dom.startOverlay.style.opacity = '0';
+        function animate() {
+            requestAnimationFrame(animate);
+            const positions = particleMesh.geometry.attributes.position.array;
+            for(let i=0; i<particlesCount; i++) {
+                const i3 = i * 3;
+                if(isMouseDown) {
+                    positions[i3] += (mouse.x - positions[i3]) * 0.05;
+                    positions[i3+1] += (mouse.y - positions[i3+1]) * 0.05;
+                    positions[i3+2] += (mouse.z - positions[i3+2]) * 0.05;
+                } else {
+                    positions[i3] += velocity[i3];
+                    positions[i3+1] += velocity[i3+1];
+                    if(Math.abs(positions[i3]) > 1000) velocity[i3] *= -1;
+                    if(Math.abs(positions[i3+1]) > 1000) velocity[i3+1] *= -1;
+                }
+            }
+            particleMesh.geometry.attributes.position.needsUpdate = true;
+            particleMesh.rotation.z += 0.001;
+            renderer.render(scene, camera);
+        }
+        animate();
 
-    setTimeout(() => {
-        dom.startOverlay.classList.add('hidden');
-        dom.mainUI.style.opacity = '1';
-        typeWriter(TEXT, dom.blessing);
-    }, 1000);
-});
+        // 启动逻辑
+        startBtn.onclick = () => {
+            bgm.play();
+            document.getElementById('start-overlay').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('start-overlay').classList.add('hidden');
+                document.getElementById('main-ui').style.opacity = '1';
+                typeWriter();
+            }, 1000);
+        };
 
-/* =======================
-   初始化
-======================= */
-initThree();
-window.addEventListener('resize', onResize);
-</script>
+        let idx = 0;
+        function typeWriter() {
+            if (idx < text.length) {
+                blessingEl.innerHTML += text.charAt(idx);
+                idx++;
+                setTimeout(typeWriter, 90);
+            } else {
+                wishBtn.classList.remove('hidden');
+            }
+        }
+
+        wishBtn.onclick = async () => {
+            wishBtn.classList.add('hidden');
+            document.getElementById('cake-area').classList.remove('hidden');
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioCtx.createMediaStreamSource(stream);
+                const analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                source.connect(analyser);
+                const data = new Uint8Array(analyser.frequencyBinCount);
+                
+                function detectBlow() {
+                    analyser.getByteFrequencyData(data);
+                    const volume = data.reduce((a, b) => a + b) / data.length;
+                    if (volume > 55) {
+                        extinguish();
+                        stream.getTracks().forEach(t => t.stop());
+                    } else {
+                        requestAnimationFrame(detectBlow);
+                    }
+                }
+                detectBlow();
+            } catch (e) {
+                document.getElementById('mic-tip').innerText = "环境限制，点击蛋糕吹灭 🕯️";
+                document.getElementById('cake-icon').onclick = extinguish;
+            }
+        };
+
+        function extinguish() {
+            const icon = document.getElementById('cake-icon');
+            icon.innerHTML = '🍰';
+            icon.classList.add('extinguished');
+            document.getElementById('mic-tip').innerText = "生日快乐，心想事成！✨";
+            confetti({ particleCount: 200, spread: 90, origin: { y: 0.7 } });
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
 </body>
 </html>
