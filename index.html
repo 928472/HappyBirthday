@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>生日贺卡 - 生日快乐</title>
+    <title>生日贺卡</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.6.0/confetti.browser.min.js"></script>
@@ -11,12 +11,14 @@
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Noto Serif SC', serif; color: white; touch-action: none; }
         #canvas-container { position: absolute; inset: 0; z-index: 1; }
-        .glass-panel { background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 2rem; box-shadow: 0 0 40px rgba(0,0,0,0.8); }
-        .neon-text { text-shadow: 0 0 20px #ff69b4, 0 0 40px rgba(255,105,180,0.3); }
-        #start-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; justify-content: center; align-items: center; background: #000; transition: opacity 1s; }
+        .glass-panel { background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 2.5rem; }
+        .neon-text { text-shadow: 0 0 20px #ff69b4, 0 0 40px rgba(255,105,180,0.4); }
+        #start-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; justify-content: center; align-items: center; transition: opacity 1s; }
         .hidden { display: none !important; }
-        .cake-emoji { font-size: 8rem; filter: drop-shadow(0 0 20px gold); transition: transform 0.3s; }
-        .extinguished { filter: grayscale(1) brightness(0.4) !important; transform: scale(0.9); }
+        .cake-rain { position: fixed; top: -50px; pointer-events: none; z-index: 100; font-size: 2rem; animation: fall linear forwards; }
+        @keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
+        .cake-main { font-size: 8rem; filter: drop-shadow(0 0 30px gold); cursor: pointer; transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .cake-main:active { transform: scale(0.8); }
     </style>
 </head>
 <body>
@@ -24,21 +26,21 @@
     <div id="canvas-container"></div>
 
     <div id="start-overlay">
-        <div class="text-center p-12 glass-panel border-pink-500/20">
-            <h2 class="text-7xl mb-12 font-bold text-white neon-text">生日贺卡</h2>
-            <button id="start-btn" class="px-16 py-4 bg-white text-black rounded-full font-bold text-xl active:scale-95 transition-all">开启惊喜 ✨</button>
+        <div class="text-center p-14 glass-panel border-pink-500/30">
+            <h2 class="text-7xl mb-14 font-bold text-white neon-text">生日贺卡</h2>
+            <button id="start-btn" class="px-20 py-5 bg-white text-black rounded-full font-bold text-2xl hover:bg-pink-500 hover:text-white transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)]">点击开启 ✨</button>
         </div>
     </div>
 
     <div id="main-ui" class="fixed inset-0 flex flex-col justify-center items-center opacity-0 transition-opacity duration-1000 z-10 px-8 pointer-events-none">
-        <div id="text-box" class="glass-panel p-8 max-w-lg w-full text-center mb-6 pointer-events-auto">
-            <p id="blessing" class="text-xl leading-relaxed min-h-[140px] text-pink-50 font-medium"></p>
-            <button id="wish-btn" class="hidden mt-6 px-10 py-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white font-bold animate-pulse shadow-lg">点击许愿 🎂</button>
+        <div id="text-box" class="glass-panel p-10 max-w-lg w-full text-center mb-8 pointer-events-auto">
+            <p id="blessing" class="text-2xl leading-relaxed min-h-[160px] text-pink-50 font-medium tracking-wide"></p>
+            <button id="wish-btn" class="hidden mt-8 px-12 py-4 bg-gradient-to-r from-pink-500 to-indigo-600 rounded-full text-white font-bold text-lg shadow-xl hover:scale-105 active:scale-95 transition-transform">许个愿吧 🎂</button>
         </div>
 
         <div id="cake-area" class="hidden text-center pointer-events-auto">
-            <div id="cake-icon" class="cake-emoji">🎂</div>
-            <p id="mic-tip" class="mt-4 text-pink-400 font-bold animate-bounce text-lg">对着麦克风吹气！💨</p>
+            <div id="cake-icon" class="cake-main">🎂</div>
+            <p id="final-tip" class="mt-6 text-pink-400 font-bold text-xl animate-pulse">点击蛋糕许下心愿</p>
         </div>
     </div>
 
@@ -49,66 +51,65 @@
         const bgm = document.getElementById('bgm');
         const text = "岁序更替，华章日新。愿你有直面清晨日光的热忱，亦有漫步黄昏余晖的从容。所有的美好都“诞”生于此，祝你生日快乐。✨";
 
-        // --- 粒子引擎保持不变 ---
+        // --- THREE.JS 极限流体粒子背景 ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 1, 3000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-        const particlesCount = 8000;
-        const posArray = new Float32Array(particlesCount * 3);
-        const velocity = new Float32Array(particlesCount * 3);
+        const particlesCount = 10000;
+        const positions = new Float32Array(particlesCount * 3);
+        const velocities = new Float32Array(particlesCount * 3);
         for(let i=0; i<particlesCount*3; i++) {
-            posArray[i] = (Math.random() - 0.5) * 2000;
-            velocity[i] = (Math.random() - 0.5) * 2;
+            positions[i] = (Math.random() - 0.5) * 2000;
+            velocities[i] = (Math.random() - 0.5) * 1.5;
         }
 
         const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        const material = new THREE.PointsMaterial({ color: 0xff69b4, size: 2.5, transparent: true, opacity: 0.8 });
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const material = new THREE.PointsMaterial({ color: 0xffb6c1, size: 2, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
         const particleMesh = new THREE.Points(geometry, material);
         scene.add(particleMesh);
         camera.position.z = 1000;
 
-        let mouse = new THREE.Vector3(0, 0, -1000);
-        let isMouseDown = false;
-
-        const onPointerMove = (e) => {
-            const x = (e.clientX || e.touches[0].clientX) / window.innerWidth * 2 - 1;
-            const y = -((e.clientY || e.touches[0].clientY) / window.innerHeight * 2 - 1);
-            mouse.set(x * 1000, y * 1000, 0);
+        let mouse = { x: 0, y: 0, active: false };
+        const updateMouse = (e) => {
+            mouse.x = ((e.clientX || e.touches[0].clientX) / window.innerWidth) * 2 - 1;
+            mouse.y = -((e.clientY || e.touches[0].clientY) / window.innerHeight) * 2 + 1;
+            mouse.active = true;
         };
-        window.addEventListener('mousedown', () => isMouseDown = true);
-        window.addEventListener('mouseup', () => isMouseDown = false);
-        window.addEventListener('mousemove', onPointerMove);
-        window.addEventListener('touchstart', () => isMouseDown = true);
-        window.addEventListener('touchend', () => isMouseDown = false);
-        window.addEventListener('touchmove', onPointerMove);
+        window.addEventListener('mousemove', updateMouse);
+        window.addEventListener('touchstart', updateMouse);
+        window.addEventListener('touchmove', updateMouse);
+        window.addEventListener('touchend', () => mouse.active = false);
 
         function animate() {
             requestAnimationFrame(animate);
-            const positions = particleMesh.geometry.attributes.position.array;
+            const pos = particleMesh.geometry.attributes.position.array;
+            const targetX = mouse.x * 800;
+            const targetY = mouse.y * 500;
+
             for(let i=0; i<particlesCount; i++) {
                 const i3 = i * 3;
-                if(isMouseDown) {
-                    positions[i3] += (mouse.x - positions[i3]) * 0.05;
-                    positions[i3+1] += (mouse.y - positions[i3+1]) * 0.05;
-                    positions[i3+2] += (mouse.z - positions[i3+2]) * 0.05;
+                if(mouse.active) {
+                    // 极限流体吸引：带阻尼感的向心力
+                    pos[i3] += (targetX - pos[i3]) * 0.03;
+                    pos[i3+1] += (targetY - pos[i3+1]) * 0.03;
                 } else {
-                    positions[i3] += velocity[i3];
-                    positions[i3+1] += velocity[i3+1];
-                    if(Math.abs(positions[i3]) > 1000) velocity[i3] *= -1;
-                    if(Math.abs(positions[i3+1]) > 1000) velocity[i3+1] *= -1;
+                    pos[i3] += velocities[i3];
+                    pos[i3+1] += velocities[i3+1];
+                    if(Math.abs(pos[i3]) > 1200) velocities[i3] *= -1;
+                    if(Math.abs(pos[i3+1]) > 800) velocities[i3+1] *= -1;
                 }
             }
             particleMesh.geometry.attributes.position.needsUpdate = true;
-            particleMesh.rotation.z += 0.001;
+            particleMesh.rotation.y += 0.001;
             renderer.render(scene, camera);
         }
         animate();
 
-        // 启动逻辑
+        // --- 逻辑控制 ---
         startBtn.onclick = () => {
             bgm.play();
             document.getElementById('start-overlay').style.opacity = '0';
@@ -116,7 +117,7 @@
                 document.getElementById('start-overlay').classList.add('hidden');
                 document.getElementById('main-ui').style.opacity = '1';
                 typeWriter();
-            }, 1000);
+            }, 800);
         };
 
         let idx = 0;
@@ -130,42 +131,31 @@
             }
         }
 
-        wishBtn.onclick = async () => {
+        // --- 蛋糕雨大招 ---
+        wishBtn.onclick = () => {
             wishBtn.classList.add('hidden');
             document.getElementById('cake-area').classList.remove('hidden');
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const source = audioCtx.createMediaStreamSource(stream);
-                const analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 256;
-                source.connect(analyser);
-                const data = new Uint8Array(analyser.frequencyBinCount);
-                
-                function detectBlow() {
-                    analyser.getByteFrequencyData(data);
-                    const volume = data.reduce((a, b) => a + b) / data.length;
-                    if (volume > 55) {
-                        extinguish();
-                        stream.getTracks().forEach(t => t.stop());
-                    } else {
-                        requestAnimationFrame(detectBlow);
-                    }
-                }
-                detectBlow();
-            } catch (e) {
-                document.getElementById('mic-tip').innerText = "环境限制，点击蛋糕吹灭 🕯️";
-                document.getElementById('cake-icon').onclick = extinguish;
+            
+            // 触发中速蛋糕雨
+            const icons = ['🎂', '🍰', '🧁', '🍩', '🎁', '💖'];
+            for(let i=0; i<60; i++) {
+                setTimeout(() => {
+                    const drop = document.createElement('div');
+                    drop.className = 'cake-rain';
+                    drop.innerHTML = icons[Math.floor(Math.random() * icons.length)];
+                    drop.style.left = Math.random() * 100 + 'vw';
+                    drop.style.animationDuration = (Math.random() * 3 + 4) + 's'; // 中速 4-7秒
+                    document.body.appendChild(drop);
+                    setTimeout(() => drop.remove(), 7000);
+                }, i * 150);
             }
         };
 
-        function extinguish() {
-            const icon = document.getElementById('cake-icon');
-            icon.innerHTML = '🍰';
-            icon.classList.add('extinguished');
-            document.getElementById('mic-tip').innerText = "生日快乐，心想事成！✨";
-            confetti({ particleCount: 200, spread: 90, origin: { y: 0.7 } });
-        }
+        document.getElementById('cake-icon').onclick = () => {
+            confetti({ particleCount: 250, spread: 100, origin: { y: 0.6 }, colors: ['#ff69b4', '#ffffff', '#ffd700'] });
+            document.getElementById('cake-icon').innerHTML = '🍰';
+            document.getElementById('final-tip').innerText = "愿望成真，永远开心！✨";
+        };
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
